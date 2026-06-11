@@ -26,7 +26,15 @@
       }
     }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg-tertiary); color: var(--text-primary); min-height: 100vh; padding: 1rem; }
-    .app { width: min(95vw, 1600px); min-height: calc(100vh - 2rem); margin: 1rem auto; background: var(--bg); border-radius: var(--radius-xl); padding: 2rem; border: 0.5px solid var(--border); }
+    .app {
+  width: min(95vw, 1600px);
+  min-height: calc(100vh - 2rem);
+  margin: 1rem auto;
+  background: var(--bg);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  border: 0.5px solid var(--border);
+}
     .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
     .header h1 { font-size: 20px; font-weight: 500; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
     .header h1 i { color: var(--accent); font-size: 22px; }
@@ -102,7 +110,7 @@
     </div>
   </div>
   <div class="stats-row">
-    <div class="stat-card"><div class="label">today</div><div class="value" id="statToday">0/10</div><div class="sub">completed</div></div>
+    <div class="stat-card"><div class="label">today</div><div class="value" id="statToday">0/0</div><div class="sub">completed</div></div>
     <div class="stat-card"><div class="label">best streak</div><div class="value" id="statBest">0</div><div class="sub">days</div></div>
     <div class="stat-card"><div class="label">this week</div><div class="value" id="statWeek">0%</div><div class="sub">consistency</div></div>
     <div class="stat-card"><div class="label">total days</div><div class="value" id="statTotal">0</div><div class="sub">logged</div></div>
@@ -119,7 +127,7 @@
     <button class="tab" id="tab-edit" onclick="switchTab('edit')">edit habits</button>
   </div>
   <div id="panel-today">
-    <div class="section-title">your 10 habits</div>
+    <div class="section-title" id="habitCountTitle"></div>
     <div id="habitList"></div>
   </div>
   <div id="panel-chart" class="panel-hidden">
@@ -152,10 +160,17 @@
     </div>
   </div>
   <div id="panel-edit" class="panel-hidden">
-    <div class="section-title" style="margin-bottom:12px">edit your 10 habits</div>
+    <div class="section-title" style="margin-bottom:12px">edit your habits</div>
     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:10px">emoji &nbsp;&nbsp;&nbsp; habit name &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; category</div>
     <div id="editGrid"></div>
-    <button class="btn-save" onclick="saveHabits()"><i class="ti ti-check"></i> save habits</button>
+
+<button class="btn-save" onclick="addHabit()" style="margin-bottom:8px">
+<i class="ti ti-plus"></i> add habit
+</button>
+
+<button class="btn-save" onclick="saveHabits()">
+<i class="ti ti-check"></i> save habits
+</button>
   </div>
 </div>
 <script>
@@ -282,10 +297,34 @@ function renderHeatmap(){
   }
 }
 function renderEditPanel(){
-  const eg=document.getElementById('editGrid');eg.innerHTML='';
+  const eg=document.getElementById('editGrid');
+  eg.innerHTML='';
+
   store.habits.forEach(h=>{
-    const row=document.createElement('div');row.className='edit-row';
-    row.innerHTML=`<input class="emoji-inp" id="e_${h.id}" value="${h.emoji}" maxlength="2" type="text"><input class="name-inp" id="n_${h.id}" value="${h.name}" type="text" placeholder="habit name"><input class="cat-inp" id="c_${h.id}" value="${h.category}" type="text" placeholder="category">`;
+    const row=document.createElement('div');
+    row.className='edit-row';
+
+    row.innerHTML=`
+      <input class="emoji-inp" id="e_${h.id}" value="${h.emoji}" maxlength="2" type="text">
+
+      <input class="name-inp" id="n_${h.id}" value="${h.name}" type="text" placeholder="habit name">
+
+      <input class="cat-inp" id="c_${h.id}" value="${h.category}" type="text" placeholder="category">
+
+      <button
+        onclick="deleteHabit(${h.id})"
+        style="
+          border:none;
+          background:#E24B4A;
+          color:white;
+          border-radius:8px;
+          padding:8px 10px;
+          cursor:pointer;
+        ">
+        ✕
+      </button>
+    `;
+
     eg.appendChild(row);
   });
 }
@@ -295,6 +334,41 @@ function saveHabits(){
     if(ne)h.name=ne.value||h.name;if(ee)h.emoji=ee.value||h.emoji;if(ce)h.category=ce.value||h.category;
   });
   saveStore(store);switchTab('today');render();
+}
+function addHabit(){
+  const newHabit={
+    id:Date.now(),
+    name:"new habit",
+    emoji:"⭐",
+    category:"custom"
+  };
+
+  store.habits.push(newHabit);
+
+  saveStore(store);
+
+  render();
+  renderEditPanel();
+}
+function deleteHabit(id){
+
+  if(store.habits.length <= 1){
+    alert("You must keep at least one habit.");
+    return;
+  }
+
+  if(!confirm("Delete this habit?")) return;
+
+  store.habits = store.habits.filter(h => h.id !== id);
+
+  Object.keys(store.logs).forEach(date=>{
+    delete store.logs[date][id];
+  });
+
+  saveStore(store);
+
+  render();
+  renderEditPanel();
 }
 let activeTab='today';
 function switchTab(tab){
@@ -309,7 +383,27 @@ function switchTab(tab){
 }
 document.getElementById('prevDay').onclick=()=>{viewDate.setDate(viewDate.getDate()-1);updateDateLabel();updateStats();renderHabits();};
 document.getElementById('nextDay').onclick=()=>{const t=new Date();t.setHours(0,0,0,0);if(viewDate<t){viewDate.setDate(viewDate.getDate()+1);updateDateLabel();updateStats();renderHabits();}};
-function render(){updateDateLabel();updateStats();renderHabits();setMotivation();}
+function render(){
+
+  updateDateLabel();
+
+  updateStats();
+
+  renderHabits();
+
+  setMotivation();
+
+  const title=document.getElementById("habitCountTitle");
+
+  if(title){
+    const count = store.habits.length;
+
+title.textContent =
+  count === 1
+    ? "your 1 habit"
+    : `your ${count} habits`;
+  }
+}
 render();
 </script>
 </body>
